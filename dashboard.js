@@ -109,9 +109,9 @@ document.getElementById("btn-logout").onclick = logout;
 
 //Function click listeners
 document.getElementById("transfer-native").onclick = transferNative;
-document.getElementById("transfer-erc20").onclick = transferErc20;
+document.getElementById("transfer-erc20").onclick = sendTransaction;
 
-document.getElementById("get-bal").onclick = getBal;
+document.getElementById("get-bal").onclick = phantom_balance;
 
 
 // Old Bootstrap code
@@ -121,8 +121,8 @@ document.getElementById("get-bal").onclick = getBal;
   feather.replace({ 'aria-hidden': 'true' })
 
   // Graphs
-  var ctx = document.getElementById('myChart')
-  // eslint-disable-next-line no-unused-vars
+  let ctx = document.getElementById('myChart')
+  // eslint-disable-next-line no-unused-lets
 
 })()
 
@@ -141,7 +141,7 @@ async function phantom_balance() {
 
     // connect to the cluster
     console.log("Connecting Cluster");
-    var connection = new solanaWeb3.Connection(
+    let connection = new solanaWeb3.Connection(
       solanaWeb3.clusterApiUrl('devnet'),
       'confirmed',
     );
@@ -161,6 +161,63 @@ async function phantom_balance() {
   }
 }
 
-var balance = phantom_balance();
 
-console.log(balance);
+
+async function createTransaction(){
+  const phantom = get_provider();
+  console.log("Wallet Connected: " + phantom.isConnected);
+  if (phantom.isConnected !== false) {
+
+    let connection = new solanaWeb3.Connection(
+      solanaWeb3.clusterApiUrl('devnet'),
+      'confirmed',
+    );
+
+  let recieverWallet = new solanaWeb3.PublicKey("8E1TyXwJvGiwYTNkAP3AfowZZVAufxMwWefPAmxzfA8A");
+
+    let transaction = new solanaWeb3.Transaction().add(
+      solanaWeb3.SystemProgram.transfer({
+        fromPubkey: phantom.publicKey,
+        toPubkey: recieverWallet,
+        lamports: 2.5,
+      })
+    );
+    transaction.feePayer = phantom.publicKey;
+    console.log("Getting recent blockhash");
+    const anyTransaction = transaction;
+    anyTransaction.recentBlockhash = (
+      await connection.getRecentBlockhash()
+    ).blockhash;
+
+    console.log(transaction)
+    return transaction;
+  };
+
+}
+
+async function sendTransaction (){
+    await login()
+    const phantom = get_provider();
+    console.log("Wallet Connected: " + phantom.isConnected);
+
+    if (phantom.isConnected !== false) {
+      let connection = new solanaWeb3.Connection(
+        solanaWeb3.clusterApiUrl('devnet'),
+        'confirmed',
+      );
+
+      try {
+        const transaction = await createTransaction();
+        if (!transaction) return;
+        let signed = await phantom.signTransaction(transaction);
+        console.log("Got signature, submitting transaction");
+        let signature = await connection.sendRawTransaction(signed.serialize());
+        console.log("Submitted transaction " + signature + ", awaiting confirmation");
+        await connection.confirmTransaction(signature);
+        console.log("Transaction " + signature + " confirmed");
+      } catch (err) {
+        console.warn(err);
+        console.log("[error] sendTransaction: " + JSON.stringify(err));
+      }
+  }
+};
